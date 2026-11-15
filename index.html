@@ -145,13 +145,15 @@ const W2S=(x,y)=>[x*V.s+V.x,y*V.s+V.y],S2W=(x,y)=>[(x-V.x)/V.s,(y-V.y)/V.s];
 function rs(){const r=cv.getBoundingClientRect();D=devicePixelRatio||1;cv.width=r.width*D;cv.height=r.height*D;draw()}
 addEventListener('resize',rs);
 let angMode=90;
+// середина стены по чистому (внутреннему) размеру, в мм от начала стены
+function wallMidT(w){const g=geom(w,rooms().nm);return g.fa+(g.L-g.fa-g.fb)/2}
 function snapPt(sx,sy,from){
  const[x,y]=S2W(sx,sy),tol=24/V.s;let bn=null,bd=tol;
  for(const n of P.nodes){const d=Math.hypot(n.x-x,n.y-y);if(d<bd){bd=d;bn=n}}
  if(!from){
   if(bn)return{x:bn.x,y:bn.y,node:bn};
   {let bw=null,bdw=tol;for(const w of P.walls){if(w.s)continue;const a=nd(w.a),b=nd(w.b),dx=b.x-a.x,dy=b.y-a.y,L2=dx*dx+dy*dy||1,t=((x-a.x)*dx+(y-a.y)*dy)/L2;if(t<=0||t>=1)continue;const qx=a.x+dx*t,qy=a.y+dy*t,d=Math.hypot(x-qx,y-qy);if(d<bdw){bdw=d;bw={x:Math.round(qx),y:Math.round(qy),wall:w}}}
-   if(bw)return bw}
+   if(bw){const w=bw.wall,a=nd(w.a),b=nd(w.b),L=Math.hypot(b.x-a.x,b.y-a.y)||1,tm=wallMidT(w),tp=Math.hypot(bw.x-a.x,bw.y-a.y);if(Math.abs(tp-tm)<30/V.s){bw.x=Math.round(a.x+(b.x-a.x)*tm/L);bw.y=Math.round(a.y+(b.y-a.y)*tm/L);bw.mid=1}return bw}}
   let px=Math.round(x/10)*10,py=Math.round(y/10)*10,gx=null,gy=null;
   for(const n of P.nodes){if(Math.abs(n.x-x)<tol&&(!gx||Math.abs(n.x-x)<Math.abs(gx.x-x)))gx=n;if(Math.abs(n.y-y)<tol&&(!gy||Math.abs(n.y-y)<Math.abs(gy.y-y)))gy=n}
   if(gx)px=gx.x;if(gy)py=gy.y;
@@ -162,7 +164,7 @@ function snapPt(sx,sy,from){
  const ux=Math.cos(a),uy=Math.sin(a);
    if(bn){const rx=bn.x-from.x,ry=bn.y-from.y;if(Math.abs(rx*uy-ry*ux)<tol*.7&&rx*ux+ry*uy>0)return{x:bn.x,y:bn.y,node:bn}}
  {const Lr=Math.max(0,dx*ux+dy*uy);let bw=null,bdw=tol;for(const w of P.walls){if(w.s||w.a===from.id||w.b===from.id)continue;const p=nd(w.a),q=nd(w.b),ex=q.x-p.x,ey=q.y-p.y,den=ux*ey-uy*ex;if(Math.abs(den)<1e-9)continue;const t=((p.x-from.x)*ey-(p.y-from.y)*ex)/den,sp=((p.x-from.x)*uy-(p.y-from.y)*ux)/den,Lw=Math.hypot(ex,ey);if(t<=0||sp<=0||sp>=1||Math.min(sp,1-sp)*Lw<tol*.4)continue;const d=Math.abs(t-Lr);if(d<bdw){bdw=d;bw={x:Math.round(from.x+ux*t),y:Math.round(from.y+uy*t),wall:w}}}
-  if(bw)return bw}
+  if(bw){const w=bw.wall,a=nd(w.a),b=nd(w.b),Lw=Math.hypot(b.x-a.x,b.y-a.y)||1,tm=wallMidT(w),tp=Math.hypot(bw.x-a.x,bw.y-a.y);if(Math.abs(tp-tm)<2)bw.mid=1;else if(!angMode&&Math.abs(tp-tm)<30/V.s){bw.x=Math.round(a.x+(b.x-a.x)*tm/Lw);bw.y=Math.round(a.y+(b.y-a.y)*tm/Lw);bw.mid=1}return bw}}
  let L=Math.max(0,dx*ux+dy*uy),best=null,bl=tol;
  const ax=Math.abs(ux)>.999,ay=Math.abs(uy)>.999;
  if(ax||ay)for(const n of P.nodes){if(n.id===from.id)continue;const c=ax?(n.x-from.x)*ux:(n.y-from.y)*uy;if(c>0&&Math.abs(c-L)<bl){bl=Math.abs(c-L);best={L:c,g:n}}}
@@ -340,7 +342,8 @@ function draw(grid=true){LB.length=0;
    if(chain){const[cx,cy]=W2S(chain.x,chain.y);ctx.setLineDash([6,5]);ctx.strokeStyle=ac;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(hx,hy);ctx.stroke();ctx.setLineDash([]);
     const l=Math.round(Math.hypot(hover.x-chain.x,hover.y-chain.y));ctx.font='700 15px system-ui';ctx.textAlign='center';ctx.textBaseline='bottom';ctx.lineWidth=4;ctx.strokeStyle='#fff';ctx.strokeText(fl(l)+' '+UL[unit()],(cx+hx)/2,(cy+hy)/2-8);ctx.fillStyle=ac;ctx.fillText(fl(l)+' '+UL[unit()],(cx+hx)/2,(cy+hy)/2-8)}
    for(const g of[hover.g,hover.gx,hover.gy])if(g){const[gx,gy]=W2S(g.x,g.y);ctx.setLineDash([3,4]);ctx.strokeStyle='#e08a00';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(gx,gy);ctx.lineTo(hx,hy);ctx.stroke();ctx.setLineDash([])}
-   ctx.beginPath();ctx.arc(hx,hy,6,0,7);ctx.strokeStyle=ac;ctx.lineWidth=2;ctx.stroke()}
+   ctx.beginPath();ctx.arc(hx,hy,6,0,7);ctx.strokeStyle=ac;ctx.lineWidth=2;ctx.stroke();
+   if(hover.mid){ctx.beginPath();ctx.moveTo(hx,hy-11);ctx.lineTo(hx+11,hy);ctx.lineTo(hx,hy+11);ctx.lineTo(hx-11,hy);ctx.closePath();ctx.fillStyle=ac;ctx.globalAlpha=.35;ctx.fill();ctx.globalAlpha=1;ctx.stroke();ctx.font='700 13px system-ui';ctx.textAlign='left';ctx.textBaseline='bottom';ctx.lineWidth=4;ctx.strokeStyle='#fff';ctx.strokeText('середина',hx+14,hy-8);ctx.fillStyle=ac;ctx.fillText('середина',hx+14,hy-8)}}
  }
 }
 function dimSeg(g,s0,s1,px){
@@ -441,8 +444,9 @@ function stDraw(c,w,h,fw,on,ac,sc){const{S,A,C}=stLines(c,w,h,fw,sc),col=on?ac:'
  for(const q of C){ctx.beginPath();ctx.arc(q[0],q[1],Math.max(1,q[2]),0,7);ctx.stroke()}
  if(A.length>1){ctx.beginPath();A.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.stroke();const p=A[A.length-1],q=A[A.length-2],an=Math.atan2(p[1]-q[1],p[0]-q[0]);ctx.beginPath();ctx.moveTo(p[0]+Math.cos(an)*6,p[1]+Math.sin(an)*6);ctx.lineTo(p[0]-Math.cos(an-.5)*8,p[1]-Math.sin(an-.5)*8);ctx.lineTo(p[0]-Math.cos(an+.5)*8,p[1]-Math.sin(an+.5)*8);ctx.closePath();ctx.fill()}}
 function placeOp(x,y){
- const w=hitW(x,y);if(!w)return;const t=hitT,nm=rooms().nm,g=geom(w,nm),wd=Math.min(tool==='door'?900:1200,g.AL);
- push();const o=Math.round(Math.max(0,Math.min(g.AL-wd,t-wd/2))/10)*10,op={id:P.n++,w:w.id,o,wd,t:tool,sw:nm[w.id]?-1:1,hg:0};hdApply(op);P.ops.push(op);sel={k:'o',id:op.id};upd()}
+ const w=hitW(x,y);if(!w)return;let t=hitT;const nm=rooms().nm,g=geom(w,nm),wd=Math.min(tool==='door'?900:1200,g.AL);let mid=false;
+ if(!g.s){const tm=g.fa+(g.L-g.fa-g.fb)/2;if(Math.abs(t-tm)<30/V.s){t=tm;mid=true}}
+ push();const o=mid?Math.round(Math.max(0,Math.min(g.AL-wd,t-wd/2))):Math.round(Math.max(0,Math.min(g.AL-wd,t-wd/2))/10)*10,op={id:P.n++,w:w.id,o,wd,t:tool,sw:nm[w.id]?-1:1,hg:0};hdApply(op);P.ops.push(op);sel={k:'o',id:op.id};upd()}
 function wallAngle(w){
  const pv=deg(w.a)>1?w.a:deg(w.b)>1?w.b:null;if(!pv)return null;
  const w2=P.walls.find(x=>x!==w&&(x.a===pv||x.b===pv)),mv=pv===w.a?w.b:w.a,on=w2.a===pv?w2.b:w2.a,p=nd(pv),m=nd(mv),o=nd(on),v1x=o.x-p.x,v1y=o.y-p.y,v2x=m.x-p.x,v2y=m.y-p.y,cr=v1x*v2y-v1y*v2x;
@@ -615,10 +619,11 @@ function elQuad(el,g){const wd=Math.min(el.wd,g.L),o0=Math.max(0,Math.min(el.o,g
 function hitEl(sx,sy){const[x,y]=S2W(sx,sy),tl=10/V.s,nm=rooms().nm;for(const el of P.els){const w=wl(el.w);if(!w)continue;const g=geom(w,nm),e=elQuad(el,g),s=(x-g.a.x)*g.u.x+(y-g.a.y)*g.u.y,o=(x-g.a.x)*g.n.x+(y-g.a.y)*g.n.y;if(s>=e.o0-tl&&s<=e.o1+tl&&o>=Math.min(e.f0,e.f1)-tl&&o<=Math.max(e.f0,e.f1)+tl)return el}return null}
 function placeEl(x,y){
  const h=hitEl(x,y);if(h){sel={k:'e',id:h.id};panel();draw();return}
- const w=hitW(x,y);if(!w)return;const t=hitT,nm=rooms().nm,g=geom(w,nm),isOp=elKind==='slide'||elKind==='arch';
+ const w=hitW(x,y);if(!w)return;let t=hitT;const nm=rooms().nm,g=geom(w,nm),isOp=elKind==='slide'||elKind==='arch';let mid=false;
+ if(!g.s){const tm=g.fa+(g.L-g.fa-g.fb)/2;if(Math.abs(t-tm)<30/V.s){t=tm;mid=true}}
  if(!isOp&&g.s)return;
  const D={slide:[1200,0],arch:[1000,0],niche:[800,150],bump:[600,200]}[elKind],wd=Math.min(D[0],g.AL);
- push();const o=Math.round(Math.max(0,Math.min(g.AL-wd,t-wd/2))/10)*10,id=P.n++;
+ push();const o=mid?Math.round(Math.max(0,Math.min(g.AL-wd,t-wd/2))):Math.round(Math.max(0,Math.min(g.AL-wd,t-wd/2))/10)*10,id=P.n++;
  if(isOp){const q={id,w:w.id,o,wd,t:elKind,sw:nm[w.id]?-1:1,hg:0};hdApply(q);P.ops.push(q)}
  else{const q={id,w:w.id,o,wd,dp:D[1],t:elKind};hdApply(q);P.els.push(q)}sel=null;upd()}
 let lastS='col';
@@ -779,14 +784,31 @@ function toolPanel(){
   $('nb').onclick=()=>{sel=null;panel();draw()};$('px').onclick=delSel;return}
  if(sel.k==='m'){const d=P.dims.find(o=>o.id===sel.id);p.innerHTML='<label>Отступ линии, мм<input id="mo" type="number" value="'+d.o+'"></label><button id="px">Удалить размер</button>';$('mo').onchange=e=>{push();d.o=parseFloat(e.target.value)||0;upd()};$('px').onclick=delSel;return}
  const w=wl(sel.id);p.innerHTML='<label>Отступ линии, мм<input id="mo" type="number" value="'+Math.round(w.dd!=null?w.dd:30/V.s)+'"></label><button id="px">Вернуть авто</button>';$('mo').onchange=e=>{push();w.dd=parseFloat(e.target.value)||0;upd()};$('px').onclick=delSel}
+// после удаления стен: стены, бывшие общими и ставшие внешними, остаются физически на месте; разрезанные стены склеиваются
+function wallDelFix(nm0,ends){const nm1=rooms().nm,moved=new Set();
+ for(const w of P.walls){if(w.s)continue;const o=nm0[w.id],q=nm1[w.id];if(!(o&&o.sh)||!q||q.sh)continue;
+  for(const id of[w.a,w.b]){if(moved.has(id))continue;moved.add(id);const n=nd(id);n.x=Math.round(n.x-q.x*w.t/2);n.y=Math.round(n.y-q.y*w.t/2)}}
+ for(const id of ends)mergeAt(id)}
+function mergeAt(id){if(!nd(id))return;const ws=P.walls.filter(w=>w.a===id||w.b===id);if(ws.length!==2)return;const[w1,w2]=ws;if(w1.s||w2.s||Math.abs(w1.t-w2.t)>.5)return;
+ if(P.dims.some(d=>d.a===id||d.b===id))return;
+ const n=nd(id),p=nd(w1.a===id?w1.b:w1.a),q=nd(w2.a===id?w2.b:w2.a),ux=n.x-p.x,uy=n.y-p.y,vx=q.x-n.x,vy=q.y-n.y,lu=Math.hypot(ux,uy),lv=Math.hypot(vx,vy);
+ if(!lu||!lv||Math.abs(ux*vy-uy*vx)/(lu*lv)>1e-3||ux*vx+uy*vy<=0)return;
+ const has=w=>P.ops.some(o=>o.w===w.id)||P.els.some(o=>o.w===w.id),rev=w=>{const t=w.a;w.a=w.b;w.b=t};
+ let A=null,B=null;for(const[x,y]of[[w1,w2],[w2,w1]]){if((x.b===id||!has(x))&&(y.a===id||!has(y))){A=x;B=y;break}}if(!A)return;
+ if(A.b!==id)rev(A);if(B.a!==id)rev(B);const a=nd(A.a),L1=Math.hypot(n.x-a.x,n.y-a.y);
+ for(const arr of[P.ops,P.els])for(const o of arr)if(o.w===B.id){o.w=A.id;o.o+=L1}
+ if(P.rn&&P.rn[id]){const rm=rooms().out.find(r=>r.ids.includes(id));if(rm){const k=Math.min(...rm.ids.filter(x=>x!==id));P.rn[k]=P.rn[id]}delete P.rn[id]}
+ A.b=B.b;delete A.dd;P.walls=P.walls.filter(w=>w!==B);P.nodes=P.nodes.filter(x=>x.id!==id)}
 function delSel(){
  if(msel.length){msDelete();return}
  if(!sel||sel.k==='r')return;push();if(sel.k==='o'){P.ops=P.ops.filter(o=>o.id!==sel.id);sel=null;upd();return}
  if('tmcbeh'.includes(sel.k)){const L={t:'notes',m:'dims',c:'cols',b:'beams',e:'els',h:'sh'}[sel.k];P[L]=P[L].filter(o=>o.id!==sel.id);sel=null;upd();return}
  if(sel.k==='d'){wl(sel.id).dd=null;upd();return}
- if(sel.k==='w')P.walls=P.walls.filter(w=>w.id!==sel.id);
- else{P.walls=P.walls.filter(w=>w.a!==sel.id&&w.b!==sel.id);P.nodes=P.nodes.filter(n=>n.id!==sel.id)}
- P.nodes=P.nodes.filter(n=>deg(n.id)>0||chain&&chain.id===n.id);P.ops=P.ops.filter(o=>wl(o.w));P.els=P.els.filter(o=>wl(o.w));sel=null;upd()}
+ const nm0=rooms().nm,ends=new Set();
+ if(sel.k==='w'){const w=wl(sel.id);if(w){ends.add(w.a);ends.add(w.b)}P.walls=P.walls.filter(w=>w.id!==sel.id)}
+ else{for(const w of P.walls)if(w.a===sel.id||w.b===sel.id){ends.add(w.a);ends.add(w.b)}ends.delete(sel.id);P.walls=P.walls.filter(w=>w.a!==sel.id&&w.b!==sel.id);P.nodes=P.nodes.filter(n=>n.id!==sel.id)}
+ P.nodes=P.nodes.filter(n=>deg(n.id)>0||chain&&chain.id===n.id);P.ops=P.ops.filter(o=>wl(o.w));P.els=P.els.filter(o=>wl(o.w));
+ wallDelFix(nm0,[...ends].filter(id=>nd(id)));sel=null;upd()}
 function panel(){if(msel.length&&tool==='sel'){closeKp();msPanel();return}panel0();unitChips();if(['col','beam','el'].includes(tool)&&sel&&'cbe'.includes(sel.k)){$('pp').insertAdjacentHTML('afterbegin',chipsHtml());bindChips()}}
 function panel0(){
  closeKp();$('app').classList.remove('edit');const p=$('pp');

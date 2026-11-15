@@ -38,6 +38,7 @@ button.on{background:var(--ac2);border-color:var(--ac);color:var(--ac);font-weig
 @media (max-width:620px){#app{grid-template-columns:64px minmax(0,1fr);grid-template-rows:56px minmax(0,1fr) auto}header{grid-column:1/3}#sd{grid-column:1/3;border-left:0;border-top:1px solid var(--bd);max-height:45vh}nav button{font-size:11px;padding:4px}}
 
 /* --- визуальная доработка интерфейса --- */
+header{overflow-x:auto;scrollbar-width:none}header::-webkit-scrollbar{display:none}header>*{flex-shrink:0}header input{flex:1 1 120px;min-width:120px}
 .ns{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.55;text-align:center;margin:6px 0 0;min-height:4px}
 #bu,#br{min-width:50px!important;min-height:44px!important;padding:0!important;display:flex;align-items:center;justify-content:center}
 #bu svg,#br svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
@@ -455,12 +456,26 @@ function opPanel(){
  $('ob').onchange=ch(v=>{op.o=Math.max(0,L-op.wd-v)});$('oz').onchange=ch(v=>{op.z=v;hdSave(op,'z')});$('ov').onchange=ch(v=>{op.vh=Math.max(10,v);hdSave(op,'vh')});$('ot').onchange=ch(v=>{op.vh=Math.max(10,v-opZ(op));hdSave(op,'vh')});
  if(f){$('os').onclick=()=>{push();op.sw=-op.sw;upd()};$('oh').onclick=()=>{push();op.hg=op.hg?0:1;upd()}}
  $('px').onclick=delSel}
+function stretchAt(p0,u,on,bey){const sh=(o,kx,ky)=>{const d=(o[kx]-p0.x)*u.x+(o[ky]-p0.y)*u.y,v=d>1?bey:d>=-1?on:null;if(v){o[kx]=Math.round(o[kx]+v.x);o[ky]=Math.round(o[ky]+v.y)}};
+ for(const n of P.nodes)sh(n,'x','y');for(const c of P.cols)sh(c,'x','y');for(const n of P.notes)sh(n,'x','y');for(const h of SH()){sh(h.a,'x','y');sh(h.b,'x','y')}for(const b of P.beams){sh(b.a,'x','y');sh(b.b,'x','y')}}
+// все общие стены, лежащие на одной прямой с w (вся перегородка целиком)
+function colChain(w,nm){const a=nd(w.a),b=nd(w.b),l=Math.hypot(b.x-a.x,b.y-a.y)||1,ux=(b.x-a.x)/l,uy=(b.y-a.y)/l,on=p=>Math.abs((p.x-a.x)*uy-(p.y-a.y)*ux)<1.5,out=new Set([w]),q=[w];
+ while(q.length){const c=q.pop();for(const x of P.walls){if(out.has(x)||x.s||!(nm[x.id]&&nm[x.id].sh))continue;if(![x.a,x.b].some(id=>id===c.a||id===c.b))continue;if(on(nd(x.a))&&on(nd(x.b))){out.add(x);q.push(x)}}}return[...out]}
+function pinPoly(pt,poly){let c=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if((a.y>pt.y)!==(b.y>pt.y)&&pt.x<(b.x-a.x)*(pt.y-a.y)/(b.y-a.y)+a.x)c=!c}return c}
+// когда новая комната пристраивается к старой: старая сохраняет свой внутренний размер, стена толщиной уходит в сторону новой
+function keepOldRooms(R0){for(let g=0;g<20;g++){const nm=rooms().nm;let done=false;
+ for(const w of P.walls){if(w.s||!nm[w.id]||!nm[w.id].sh)continue;const a=nd(w.a),b=nd(w.b),l=Math.hypot(b.x-a.x,b.y-a.y);if(l<1)continue;const nx=-(b.y-a.y)/l,ny=(b.x-a.x)/l,m={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+  const i1=R0.some(r=>pinPoly({x:m.x+nx*20,y:m.y+ny*20},r)),i2=R0.some(r=>pinPoly({x:m.x-nx*20,y:m.y-ny*20},r));if(i1===i2)continue;
+  const d=i1?{x:-nx,y:-ny}:{x:nx,y:ny};stretchAt(m,d,{x:d.x*w.t/2,y:d.y*w.t/2},{x:d.x*w.t,y:d.y*w.t});done=true;break}
+ if(!done)return}}
 function place(p){
  if(chain&&p.node&&p.node.id===chain.id){chain=null;panel();draw();sync();return}
+ const R0=rooms().out.map(r=>r.ids.map(id=>{const q=nd(id);return{x:q.x,y:q.y}}));
  push();let n=p.node;
  if(!n){n={id:P.n++,x:p.x,y:p.y};P.nodes.push(n)}
  let nw=null;let wo=null;if(chain&&!P.walls.some(w=>w.a===chain.id&&w.b===n.id||w.a===n.id&&w.b===chain.id)){nw=P.n++;wo={id:nw,a:chain.id,b:n.id,t:100};P.walls.push(wo)}
  fixTopo(wo,n.id);
+ if(wo&&(p.node||p.wall))keepOldRooms(R0);
  chain=chain&&(p.node||p.wall)?null:n;if(nw)sel={k:'w',id:nw};upd()}
 function splitWall(w,n){const a=nd(w.a),b=nd(w.b),L1=Math.hypot(n.x-a.x,n.y-a.y),L=Math.hypot(b.x-a.x,b.y-a.y),w2={...w,id:P.n++,a:n.id};delete w2.s;w.b=n.id;delete w.s;P.walls.push(w2);
  for(const arr of[P.ops,P.els])for(const o of arr){if(o.w!==w.id)continue;const wd=Math.min(o.wd,L);if(o.o+wd/2>=L1){o.w=w2.id;o.wd=Math.min(o.wd,L-L1);o.o=Math.max(0,Math.min(L-L1-o.wd,o.o-L1))}else{o.wd=Math.min(o.wd,L1);o.o=Math.max(0,Math.min(L1-o.wd,o.o))}}
@@ -685,7 +700,7 @@ function photoPanel(n){const p=$('pp');p.innerHTML='<img id="phi" alt="" style="
  $('tt').onfocus=push;$('tt').oninput=e=>{n.t=e.target.value;save();draw()};
  $('phr').onclick=()=>askSrc({rep:n.id});$('px').onclick=delSel;
  $('phz').onclick=async()=>{const b=await phGet(n.ph);if(!b){msg('Фото не найдено на этом устройстве');return}const o=document.createElement('div');o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:99;display:flex;align-items:center;justify-content:center';const im=document.createElement('img');im.src=URL.createObjectURL(b);im.style.cssText='max-width:96vw;max-height:96vh';o.appendChild(im);o.onclick=()=>o.remove();document.body.appendChild(o)}}
-const SH=()=>P.sh||(P.sh=[]);let shh=null;const shDef={k:'line',c:'#d33',lw:2,ds:0,s:16};
+const SH=()=>P.sh||(P.sh=[]);let shh=null;const shDef={k:'line',c:'#dd3333',lw:2,ds:0,s:16};
 function shSnap(wx,wy,from){const n=P.nodes.find(m=>Math.hypot(m.x-wx,m.y-wy)<18/V.s);if(n)return{x:n.x,y:n.y};let x=Math.round(wx/10)*10,y=Math.round(wy/10)*10;if(from){const dx=x-from.x,dy=y-from.y;if(Math.abs(dy)<Math.abs(dx)*.1)y=from.y;else if(Math.abs(dx)<Math.abs(dy)*.1)x=from.x}return{x,y}}
 function cbox(h){const[x2,y2]=W2S(h.b.x,h.b.y),s=h.s||16,w=Math.max(30,(h.t||'').length*s*.6+14),hh=s+12;return[x2-w/2,y2-hh/2,w,hh]}
 function drawSh(h,on){const ac=getComputedStyle(document.documentElement).getPropertyValue('--cac').trim()||'#0b6e8a',[x1,y1]=W2S(h.a.x,h.a.y),[x2,y2]=W2S(h.b.x,h.b.y),c=h.c||'#d33',lw=h.lw||2,s=h.s||16,ac2=on?ac:c;
@@ -704,8 +719,9 @@ function hitSh(sx,sy,onlyEnds){for(const h of[...SH()].reverse()){const[x1,y1]=W
   let d;if(h.k==='rect')d=Math.min(dSeg(sx,sy,x1,y1,x2,y1),dSeg(sx,sy,x2,y1,x2,y2),dSeg(sx,sy,x2,y2,x1,y2),dSeg(sx,sy,x1,y2,x1,y1));else d=dSeg(sx,sy,x1,y1,x2,y2);
   if(h.k==='call'){const[bx,by,bw,bh]=cbox(h);if(sx>=bx&&sx<=bx+bw&&sy>=by&&sy<=by+bh)d=0}
   if(d<14)return{h,e:null}}return null}
+const hex6=c=>{c=String(c||'#dd3333');return/^#[0-9a-f]{3}$/i.test(c)?'#'+c.slice(1).split('').map(x=>x+x).join(''):/^#[0-9a-f]{6}$/i.test(c)?c:'#dd3333'};
 function shUI(o,h){const p=$('pp'),K={line:'Линия',rect:'Прямоугольник',arrow:'Стрелка',call:'Выноска'},esc=v=>String(v||'').replace(/"/g,'&quot;');
- p.innerHTML=(h?'':'<div class="h" style="width:100%">Проведите пальцем по плану. Линии липнут к горизонтали, вертикали и узлам. Коснитесь фигуры, чтобы изменить её.</div>')+'<div style="display:flex;gap:6px;flex-wrap:wrap;width:100%">'+Object.entries(K).map(([k,v])=>'<button data-sk="'+k+'"'+((tool==='draw'?shDef.k:o.k)===k?' class="on"':'')+'>'+v+'</button>').join('')+'</div><label>Цвет<input id="sc" type="color" value="'+(o.c||'#dd3333')+'" style="width:64px;padding:2px"></label><label>Толщина<input id="sw" type="number" min="1" max="12" value="'+(o.lw||2)+'"></label><label>Шрифт<input id="sf" type="number" min="8" max="60" value="'+(o.s||16)+'"></label><button id="sdh"'+(o.ds?' class="on"':'')+'>Штрих</button>'+(h?'<label>Текст<input id="st" type="text" value="'+esc(h.t)+'" style="width:200px"></label><button id="sdu">Дублировать</button><button id="px">Удалить</button>':'');
+ p.innerHTML=(h?'':'<div class="h" style="width:100%">Проведите пальцем по плану. Линии липнут к горизонтали, вертикали и узлам. Коснитесь фигуры, чтобы изменить её.</div>')+'<div style="display:flex;gap:6px;flex-wrap:wrap;width:100%">'+Object.entries(K).map(([k,v])=>'<button data-sk="'+k+'"'+((tool==='draw'?shDef.k:o.k)===k?' class="on"':'')+'>'+v+'</button>').join('')+'</div><label>Цвет<input id="sc" type="color" value="'+hex6(o.c)+'" style="width:64px;padding:2px"></label><label>Толщина<input id="sw" type="number" min="1" max="12" value="'+(o.lw||2)+'"></label><label>Шрифт<input id="sf" type="number" min="8" max="60" value="'+(o.s||16)+'"></label><button id="sdh"'+(o.ds?' class="on"':'')+'>Штрих</button>'+(h?'<label>Текст<input id="st" type="text" value="'+esc(h.t)+'" style="width:200px"></label><button id="sdu">Дублировать</button><button id="px">Удалить</button>':'');
  const ed=f=>{if(h){push();f();save();draw()}else f();Object.assign(shDef,{c:o.c,lw:o.lw,ds:o.ds,s:o.s})};
  p.querySelectorAll('[data-sk]').forEach(b=>b.onclick=()=>{if(tool==='draw'){shDef.k=b.dataset.sk}else ed(()=>{o.k=b.dataset.sk;if(h&&o.k==='call'&&!o.t)o.t='Текст'});shUI(o,h)});
  $('sc').oninput=e=>{o.c=e.target.value;shDef.c=o.c;if(h){save();draw()}};$('sc').onfocus=()=>{if(h)push()};
@@ -779,8 +795,11 @@ function panel0(){
   p.innerHTML='<label>'+(off?'Длина внутри, мм':'Длина, мм')+'<input id="pl" type="number" inputmode="decimal" value="'+(L-off)+'"></label>'+(off?'<div class="h" style="width:100%">Чистый размер между стенами (как рулеткой). По оси узлов: '+fl(L)+' '+UL[unit()]+'.</div>':'')+'<label>Толщина, мм<input id="pt" type="number" inputmode="decimal" value="'+w.t+'"></label>'+(wallAngle(w)?'<label>Угол, °<input id="pa" type="number" inputmode="decimal" value="'+wallAngle(w).ang.toFixed(1)+'"></label>':'')+'<label>Дуга: стрела, мм (0 = прямая)<input id="ps" type="number" value="'+Math.abs(w.s||0)+'"></label>'+(w.s?'<button id="pf">Выпуклость: '+(w.s>0?'наружу':'внутрь')+'</button><div class="h">Радиус R = '+Math.round(arcR(w))+' мм</div>':'')+'<button id="px">Удалить стену</button>';
   $('ps').onchange=e=>{const v=Math.abs(parseFloat(e.target.value))||0;push();w.s=v<1?0:(w.s<0?-v:v);if(!w.s)delete w.s;upd()};if(w.s)$('pf').onclick=()=>{push();w.s=-w.s;upd()};
   const ai=wallAngle(w);if(ai)$('pa').onchange=e=>{const v=parseFloat(e.target.value);if(!(v>0&&v<180))return panel();push();const p=nd(ai.pv),m=nd(ai.mv),o=nd(ai.on),a2=Math.atan2(o.y-p.y,o.x-p.x)+ai.sg*v*Math.PI/180,len=Math.hypot(m.x-p.x,m.y-p.y);moveNodes(m.id,Math.round(p.x+Math.cos(a2)*len)-m.x,Math.round(p.y+Math.sin(a2)*len)-m.y,[p.id]);upd()};
-  $('pl').onchange=e=>{const v0=parseFloat(e.target.value);if(!(v0>0))return panel();const v=v0+off;push();const l=Math.hypot(b.x-a.x,b.y-a.y)||1,ux=l>1?(b.x-a.x)/l:1,uy=l>1?(b.y-a.y)/l:0;const tx=Math.round(a.x+ux*v),ty=Math.round(a.y+uy*v);moveNodes(b.id,tx-b.x,ty-b.y,[a.id]);upd()};
-  $('pt').onchange=e=>{const v=parseFloat(e.target.value);if(!(v>0))return panel();push();w.t=v;upd()};
+  $('pl').onchange=e=>{const v0=parseFloat(e.target.value);if(!(v0>0))return panel();const v=v0+off;push();const l=Math.hypot(b.x-a.x,b.y-a.y)||1,ux=l>1?(b.x-a.x)/l:1,uy=l>1?(b.y-a.y)/l:0;const tx=Math.round(a.x+ux*v),ty=Math.round(a.y+uy*v);if(w.s)moveNodes(b.id,tx-b.x,ty-b.y,[a.id]);else{const dv={x:tx-b.x,y:ty-b.y};stretchAt({x:b.x,y:b.y},{x:ux,y:uy},dv,dv)}upd()};
+  $('pt').onchange=e=>{const v=parseFloat(e.target.value);if(!(v>0))return panel();push();const nm=rooms().nm,dt=v-w.t;
+   if(!w.s&&nm[w.id]&&nm[w.id].sh&&Math.abs(dt)>.5){const grp=colChain(w,nm),a=nd(w.a),b=nd(w.b),l=Math.hypot(b.x-a.x,b.y-a.y)||1;let nx=-(b.y-a.y)/l,ny=(b.x-a.x)/l;if(nx<-1e-6||(Math.abs(nx)<1e-6&&ny<0)){nx=-nx;ny=-ny}
+    for(const q of grp)q.t=v;stretchAt({x:a.x,y:a.y},{x:nx,y:ny},{x:nx*dt/2,y:ny*dt/2},{x:nx*dt,y:ny*dt});msg('Толщина изменена, размеры комнат сохранены')}
+   else w.t=v;upd()};
   $('px').onclick=delSel;
  }else if(sel&&'tmdcbeh'.includes(sel.k)){toolPanel()}else if(sel&&sel.k==='o'&&P.ops.some(o=>o.id===sel.id)){opPanel()}else if(sel&&sel.k==='n'&&nd(sel.id)){
   const n=nd(sel.id);

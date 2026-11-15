@@ -1,5 +1,5 @@
 // Обмер: офлайн-кэш. При каждом обновлении приложения меняйте номер версии.
-const C = 'obmer-v53';
+const C = 'obmer-v60';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(C).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
